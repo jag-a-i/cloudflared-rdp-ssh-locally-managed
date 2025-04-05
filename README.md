@@ -1,40 +1,59 @@
-# Setting up **RDP** _and_ **SSH**
-
-## ( _via_ **Cloudflare Tunnels** on the **Free Plan** )
+# Setting up RDP and SSH via Cloudflare Tunnels (Free Plan)
   
-- [Introduction](#introduction)
+- [Setting up RDP and SSH via Cloudflare Tunnels (Free Plan)](#setting-up-rdp-and-ssh-via-cloudflare-tunnels-free-plan)
+  - [Introduction](#introduction)
+      - [Key Feature: Templates](#key-feature-templates)
   - [Prerequisites](#prerequisites)
-- [Procedure](#procedure)
-  - [Part 1: Downloading 'cloudflared.exe'](#part-1-downloading-cloudflaredexe)
+  - [Procedure](#procedure)
+    - [Part 1: Downloading 'cloudflared.exe'](#part-1-downloading-cloudflaredexe)
   - [Part 2: Creating a Cloudflare Tunnel](#part-2-creating-a-cloudflare-tunnel)
     - [1. Start the Login Process](#1-start-the-login-process)
-    - [2. Handle Redirection Bug](#2-handle-redirection-bug)
-    - [3. Authorize Your Domain](#3-authorize-your-domain)
-    - [4. Certification File Download](#4-certification-file-download)
-    - [5. Navigate to the .cloudflared Folder](#5-navigate-to-the-cloudflared-folder)
-    - [6. Create Your Tunnel](#6-create-your-tunnel)
-  - [Part 3: Configuring the Tunnel and Creating Subdomains  
-\( This is where things usually get hairy... \)](#part-3-configuring-the-tunnel-and-creating-subdomains)
-    - [1. Download and Open the Template](#1-download-and-open-the-template)
-    - [2. Update the Tunnel ID](#2-update-the-tunnel-id)
-    - [3. Set Global Options](#3-set-global-options)
-    - [4. Decide on Subdomains](#4-decide-on-subdomains)
-    - [5. Configure Service Blocks](#5-configure-service-blocks)
-    - [6. Create DNS Records](#6-create-dns-records)
-  - [RDP \& SSH, what you've all been waiting for...](#part-4-rdp--ssh-what-youve-all-been-waiting-for)
+      - [2. Handle Redirection Bug](#2-handle-redirection-bug)
+      - [3. Authorize Your Domain](#3-authorize-your-domain)
+      - [4. Certification File Download](#4-certification-file-download)
+      - [5. Navigate to the .cloudflared Folder](#5-navigate-to-the-cloudflared-folder)
+      - [6. Create Your Tunnel](#6-create-your-tunnel)
+  - [Part 3: Configuring the Tunnel and Creating Subdomains](#part-3-configuring-the-tunnel-and-creating-subdomains)
+    - [( This is where things usually get hairy... )](#-this-is-where-things-usually-get-hairy-)
+      - [1. Download and Open the Template](#1-download-and-open-the-template)
+        - [2. Update the Tunnel ID](#2-update-the-tunnel-id)
+      - [3. Set Global Options](#3-set-global-options)
+      - [4. Decide on Subdomains](#4-decide-on-subdomains)
+      - [5. Configure Service Blocks](#5-configure-service-blocks)
+      - [6. Create DNS Records](#6-create-dns-records)
+  - [Part 4: RDP \& SSH, what you've all been waiting for](#part-4-rdp--ssh-what-youve-all-been-waiting-for)
     - [RDP](#rdp)
     - [SSH](#ssh)
     - [TODO](#todo)
 
 ## Introduction
 
-**Welcome** to this step-by-step guide on setting up **RDP (Remote Desktop Protocol)** and SSH **(Secure Shell)** access through Cloudflare's free tier. I dedicated an enourmous amount of time trying to figure it out, even sometimes thinking it was impossible, but I never gave up... _and I finally did it._ Contrary to some misconceptions, it is entirely possible to configure RDP under the free tier. This guide aims to demystify the process, providing clear and straightforward instructions to help you succeed where others (and myself) may have encountered difficulties. This guide was written for Windows, but I imagine it would be pretty much the same setup on any platform, as the only parts of our tunnel that we configure are the config.yaml files, so the folder structure should be the only difference.
+**Welcome** to this step-by-step guide on setting up **RDP (Remote Desktop Protocol)** and **SSH (Secure Shell)** access through Cloudflare's free tier. I dedicated an enormous amount of time trying to figure it out, even sometimes thinking it was impossible, but I never gave up... _and I finally did it._ Contrary to some misconceptions, it is entirely possible to configure RDP under the free tier. This guide aims to demystify the process, providing clear and straightforward instructions to help you succeed where others (and myself) may have encountered difficulties.
+
+This guide was written primarily for **Windows**, however, the core `cloudflared` commands and `config.yml` structure are cross-platform, but specific file paths (like the location of `.cloudflared` or `.ssh/config`) will differ on **Linux** and **macOS**.
+
+Here's a high-level overview of the connection flow:
+
+```mermaid
+graph LR
+    A[Client Machine] -- RDP/SSH request --> B(Cloudflare Edge);
+    B -- Secure Tunnel <br> (Error 1033 if tunnel down) --> C["cloudflared Service on Server <br> (Routing defined in config.yml)"];
+    C -- Local Connection <br> (Error 502 if target unreachable) --> D[Target RDP/SSH Service];
+
+    subgraph Server Configuration Dependency
+        direction LR
+        C --- E((config.yml));
+        E -- Defines routing --> C;
+    end
+```
 
 #### Key Feature: Templates
 
 To simplify the process further, I've included templates for the configuration file, in addition to some simple automation scripts to enhance and simplify your experience. These templates are designed for ease of use; you'll only need to paste your specific information into them, such as your tunnel ID, domain, and hostname information. The scripts include one for starting the tunnel effortlessly—eliminating the need to remember complex command-line arguments—and another that allows this starter script to run as a hidden background service via Task Scheduler. This ensures that the tunnel operates seamlessly in the background, without interfering with your regular computer use, such as when closing multiple open Chrome tabs.
 
 Many online resources, including forums and official documentation, can be challenging to navigate and understand. This guide cuts through the complexity, offering an easy-to-follow approach to setting up RDP and SSH by manually configuring your Cloudflare tunnels.
+
+**(Optional but Recommended) Security Note:** For enhanced security, consider setting up Cloudflare Access policies for your tunnel hostnames. This allows you to require authentication (like email verification or identity provider login) before allowing connections, even on the free plan.
 
 ## Prerequisites
 
@@ -44,7 +63,7 @@ In order to successfully set up RDP/SSH access through Cloudflare tunnels, there
 
    2. Use Cloudflare for DNS: Ensure that your domain, whether free or owned, uses Cloudflare as its DNS provider. This enables the creation of tunnels through Cloudflare's network.
 
-   3. Create a Dedicated Folder: On your local machine, make a folder in your home directory \n (C:\\Users\\\<your username>) named '.cloudflared' (including the period at the beginning). This folder will be used for storing configuration files and other necessary data for the Cloudflare tunnels.
+   3. Create a Dedicated Folder: On your local machine, create a folder in your home directory (`C:\Users\<your username>`) named `.cloudflared` (including the period at the beginning). This folder will be used for storing configuration files and other necessary data for the Cloudflare tunnels.
 
    4. (Recommended) Get started with Cloudflare Tunnels: It's beneficial to reach the point in Cloudflare's own tutorials where you're able to create tunnels via their dashboard. Once you're comfortable with this, switch to this guide for a more detailed and manual setup process.
 
@@ -189,18 +208,28 @@ But due to the command we just ran, it redirects you automagically to the device
 
 ### SSH
 
-In order to get SSH to work, you must create a "config" file in your ".ssh" folder in your home directory (C\Users\<username>\.ssh). No extension, just create a text file named "config" and then erase the extension. You want to follow this format, substituting the host subdomain for whatever you named yours (NOTE: you do not need to name your SSH subdomain 'ssh', just for illustrative purposes), having the correctly formatted "service:" that your subdomain points to in the config.yml file on your server is the important part.
+In order to get SSH to work, you must create a `config` file (no extension) in your `.ssh` folder in your user's home directory (e.g., `C:\Users\<username>\.ssh` on Windows). If the folder doesn't exist, create it.
+
+Add the following block to the `config` file, replacing `ssh.yourdomain.com` with the actual hostname you configured in your `config.yml` and Cloudflare DNS.
+
+**Important:** The `ProxyCommand` path must point to where you installed `cloudflared.exe` on the *client* machine. If you followed Part 1 and added `C:\Cloudflared\bin` to your PATH, you can often just use `cloudflared.exe`. Otherwise, use the full path.
 
 ```SSH
 Host ssh.yourdomain.com
-  ProxyCommand "C:\Program Files (x86)\cloudflared\cloudflared.exe" access ssh --hostname %h
+  # Option 1: If C:\Cloudflared\bin is in your PATH
+  # ProxyCommand cloudflared.exe access ssh --hostname %h
+  # Option 2: Using the specific path from Part 1
+  ProxyCommand C:\Cloudflared\bin\cloudflared.exe access ssh --hostname %h
+  # Option 3: If installed elsewhere (Example only)
+  # ProxyCommand "C:\Program Files\Cloudflared\cloudflared.exe" access ssh --hostname %h
 ```
 
-You can add add additional entries such as this below if you have multiple subdomains pointing to SSH, for example if you have multiple devices and have a separate ssh subdomain set up for each.
+Choose **one** `ProxyCommand` line that matches your client setup. You can add multiple `Host` blocks if you have different SSH hostnames configured through the tunnel.
 
 Now, to connect, you just connect as normal, for example "ssh <tsmith@ssh.yourdomain.com>" in any terminal.  
 
 ### TODO
 
-  [ ] Upload Templates
-  [ ] Edit Final Section to Match Formatting
+*   [ ] **Upload Templates:** Ensure the template files (`config.yml`, batch scripts, etc.) mentioned are included in the repository or linked correctly.
+*   [ ] **Review Final Section Formatting:** Double-check the formatting and clarity of the RDP and SSH sections.
+*   [ ] **Add Platform Notes:** Include specific path examples for Linux/macOS in relevant sections (e.g., `.ssh/config` location).
