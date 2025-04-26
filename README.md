@@ -53,7 +53,7 @@ To simplify the process further, I've included templates for the configuration f
 
 Many online resources, including forums and official documentation, can be challenging to navigate and understand. This guide cuts through the complexity, offering an easy-to-follow approach to setting up RDP and SSH by manually configuring your Cloudflare tunnels.
 
-**(Optional but Recommended) Security Note:** For enhanced security, consider setting up Cloudflare Access policies for your tunnel hostnames. This allows you to require authentication (like email verification or identity provider login) before allowing connections, even on the free plan.
+**(Optional but Recommended) Security Note:** For enhanced security, consider setting up Access policies within the Cloudflare Zero Trust dashboard for your tunnel hostnames. This allows you to require authentication (like email verification or identity provider login) before allowing connections, even on the free plan. 
 
 ## Prerequisites
 
@@ -75,7 +75,7 @@ In order to successfully set up RDP/SSH access through Cloudflare tunnels, there
 
 Follow these steps to download and prepare cloudflared on your machine:
 
-   1. Download Cloudflared: Visit the Cloudflare/cloudflared GitHub repository and download the latest release. Make sure to download the .exe file, not the MSI installer.
+   1. **Download Cloudflared:** Visit the Cloudflare/cloudflared GitHub repository and download the latest release. Make sure to download the .exe file, not the MSI installer.
 
    2. Create a Main Folder: On your C drive, create a new folder named 'Cloudflared'. The path should be C:\\Cloudflared.
 
@@ -99,7 +99,7 @@ Next, we will get the tunnel started, which will allow us to later use our own r
 
 ### 1. Start the Login Process
 
-- Open your terminal (Command Prompt, PowerShell, etc.) and enter cloudflared tunnel login. This command will prompt your web browser to open for you to log in to your Cloudflare account
+- Open your terminal (Command Prompt, PowerShell, etc.) and enter ```cloudflared tunnel login```. This command will prompt your web browser to open for you to log in to your Cloudflare account
 
 #### 2. Handle Redirection Bug
 
@@ -157,33 +157,38 @@ Tips:
 
 Use the provided blocks in the template as a guide.
 
-- Change `hostname:` to your chosen subdomains.
-- Under `service:`, specify the local hostname or IP address and the port of the service.
+- Change the value of `hostname:` to your chosen subdomains.
+- Change the value of  `service:`, specify the local hostname or IP address and the port of the service.
 
-  - Example: For a web service, use `http://192.168.1.10:80`.
-  - For SSH, format it as `ssh://\<IP>:\<Port>`.
-  - For RDP, use `rdp://\<IP>:\<Port>`.
+Examples: 
+  - For a web service, use `http://192.168.1.10:80`.
+  - For SSH, format it as `ssh://192.168.1.10:22`, or `ssh://pc-hostname1:22`.
+  - For RDP, use `rdp://192.168.1.10:3389`, or `rdp://pc-hostname2:3389`.
 
 Indentation is Key: Ensure proper indentation in the configuration file. The dash in `- hostname:` should be two spaces from the margin, and the 's' in  `service:` four spaces in.
 
-#### 6. Create DNS Records
-
-- Log in to the Cloudflare dashboard and navigate to the DNS Rules page.
-- Set up CNAME records for each subdomain. For the target, use `<GUID OF TUNNEL>.cfargotunnel.com`.
-This redirects traffic to your tunnel instead of your personal IP. Again, you can get this from the name of the .json file if you forget it.
-
 ```markdown
-# **Special Steps for RDP and SSH:**
-
-For both RDP and SSH, you need cloudflared.exe on the client machine.
-Simply download the .exe file and place it in a folder on the client machine, such as C:\Cloudflared\bin.
-Optionally, add this folder to the PATH for convenience (but seriously do it).
-
 # **Notes:**
 
 For wildcard subdomains (like *.yourdomain.com), enclose the URL in quotes to avoid errors.
 Example: hostname: '*.example.com'
 For HTTP/S services, once DNS records are set, you can access them globally as if on your local network.
+```
+
+#### 6. Create DNS Records
+
+- Log in to the Cloudflare dashboard and navigate to the DNS Rules page of your chosen domain. 
+- Set up CNAME records for each subdomain. For the target, use `<GUID OF TUNNEL>.cfargotunnel.com`.
+- Make sure Proxy DNS is turned on. 
+This redirects traffic to your tunnel when that subdomain is navigated to. Different subdomains can be redirected to as many different tunnels on the same or other tunnel servers, but each subdomain can only be routed to a single tunnel. Again, you can get this from the name of the .json file if you forget it.
+
+```markdown
+# **Special Steps for RDP and SSH:**
+
+For both RDP and SSH, you need cloudflared.exe on the client machine (machine you will be connecting from).
+Simply download the .exe file and place it in a folder on the client machine, such as C:\Cloudflared\bin.
+Optionally, add this folder to the PATH for convenience (but seriously do it).
+
 ```
 
 ## Part 4: RDP & SSH, what you've all been waiting for
